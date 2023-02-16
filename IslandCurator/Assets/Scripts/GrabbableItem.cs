@@ -2,8 +2,24 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+[RequireComponent(typeof(Collider2D))]
 public abstract class GrabbableItem : MonoBehaviour
 {
-    protected abstract void Grab(PlayerPickup player);
-    protected abstract void Drop();
+    public abstract void Grab(PlayerPickup player);
+    public abstract void Drop();
+
+    protected bool _held = false;
+
+    public bool Held
+    {
+        get => _held;
+    }
+
+    protected void OnMouseDown()
+    {
+        if (!_held)
+        {
+            Grab(PlayerPickup.Instance);
+        }
+    }
 }

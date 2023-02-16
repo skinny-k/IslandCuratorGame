@@ -1,8 +1,8 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-[RequireComponent(typeof(Navigator))]
 public class GrabVillager : GrabbableItem
 {
     [Header("Grab Feedback Settings")]
@@ -16,57 +16,57 @@ public class GrabVillager : GrabbableItem
 
     [Header("Shadow Settings")]
     [SerializeField] SpriteRenderer _shadow = null;
-    [SerializeField] float _baseShadowDistance = -0.25f;
-    [SerializeField] float _baseAlpha = 0.05f;
-    [SerializeField] float _heldAlpha = 0.2f;
-    [SerializeField] float _positionInterpolationSpeed = 10f;
+    [SerializeField] float _alphaChangeAmount = 0.15f;
     [SerializeField] float _alphaInterpolationSpeed = 1.5f;
     
     PlayerPickup _playerHolding = null;
     Navigator _movement = null;
+    Vector3 _fallOffset;
     Vector3 _fallTarget;
+    Vector3 _shadowOffset;
+    Vector3 _shadowTarget;
+    float _targetAlpha;
     float _scaleModifier = 1f;
-    bool _held = false;
     bool _falling = false;
+
+    public event Action OnGrab;
+    public event Action OnDrop;
+    public event Action OnLand;
     
-    void Start()
-    {
-        _movement = GetComponent<Navigator>();
-    }
-    
-    protected override void Grab(PlayerPickup player)
+    public override void Grab(PlayerPickup player)
     {
         _held = true;
         _scaleModifier = _clickScale;
         
         player.SetHeld(this);
         _playerHolding = player;
+        _fallOffset = new Vector3(0, -_dropDistance, 0);
+
+        _shadowTarget = _fallOffset;
+        _targetAlpha = _shadow.GetComponent<SpriteRenderer>().color.a + _alphaChangeAmount;
+
+        OnGrab?.Invoke();
     }
 
-    protected override void Drop()
+    public override void Drop()
     {
         _held = false;
         _scaleModifier = 1f;
 
         _playerHolding.ClearHeld();
+        _fallTarget = transform.localPosition + _fallOffset;
         _falling = true;
-        _fallTarget = transform.position - new Vector3(0, _dropDistance, 0);
+
+        _shadowTarget = _shadowOffset;
+        _targetAlpha = _shadow.GetComponent<SpriteRenderer>().color.a - _alphaChangeAmount;
+
+        OnDrop?.Invoke();
     }
 
-    void OnMouseDown()
+    void Start()
     {
-        if (!_held)
-        {
-            Grab(PlayerPickup.Instance);
-        }
-    }
-
-    void OnMouseUp()
-    {
-        if (_held)
-        {
-            Drop();
-        }
+        _movement = GetComponent<Navigator>();
+        _shadowOffset = _shadow.transform.localPosition;
     }
 
     void Update()
@@ -80,6 +80,14 @@ public class GrabVillager : GrabbableItem
             UpdateShadow();
         }
         UpdateScale();
+    }
+
+    void OnMouseUp()
+    {
+        if (_held)
+        {
+            Drop();
+        }
     }
 
     void UpdateScale()
@@ -99,7 +107,7 @@ public class GrabVillager : GrabbableItem
             }
             else if (_falling)
             {
-                float scaleThisFrame = Mathf.Clamp(1 + Mathf.Abs(transform.position.y - _fallTarget.y), 1, _heldScale);
+                float scaleThisFrame = Mathf.Clamp(1 + Mathf.Abs(transform.localPosition.y - _fallOffset.y), 1, _heldScale);
                 transform.localScale = new Vector3(scaleThisFrame, scaleThisFrame, transform.localScale.z);
             }
         }
@@ -112,37 +120,26 @@ public class GrabVillager : GrabbableItem
 
     void UpdateShadow()
     {
-        if (_falling && _shadow.color.a > _baseAlpha)
+        if (_shadow.color.a != _targetAlpha)
         {
-            float alphaThisFrame = Mathf.Clamp(_shadow.color.a - _alphaInterpolationSpeed * Time.deltaTime, _baseAlpha, _heldAlpha);
-            _shadow.color = new Color(_shadow.color.r, _shadow.color.g, _shadow.color.b, alphaThisFrame);
-        }
-        else if (_held && _shadow.color.a < _heldAlpha)
-        {
-            float alphaThisFrame = Mathf.Clamp(_shadow.color.a + _alphaInterpolationSpeed * Time.deltaTime, _baseAlpha, _heldAlpha);
+            float alphaThisFrame = Mathf.Clamp(_shadow.color.a + Mathf.Sign(_targetAlpha - _shadow.color.a) * _alphaInterpolationSpeed * Time.deltaTime, 0, 1);
             _shadow.color = new Color(_shadow.color.r, _shadow.color.g, _shadow.color.b, alphaThisFrame);
         }
 
-        if (_held && _shadow.transform.localPosition.y != _baseShadowDistance - _dropDistance)
+        if (_shadow.transform.localPosition != _shadowTarget)
         {
-            float yThisFrame = Mathf.Clamp(_shadow.transform.localPosition.y - _positionInterpolationSpeed * Time.deltaTime, _baseShadowDistance - _dropDistance, _baseShadowDistance);
-            _shadow.transform.localPosition = new Vector3(0, yThisFrame, _shadow.transform.localPosition.z);
-        }
-        else if (_falling && _shadow.transform.localPosition.y != _baseShadowDistance)
-        {
-            float yThisFrame = Mathf.Clamp(_shadow.transform.localPosition.y + _fallSpeed * Time.deltaTime, _baseShadowDistance - _dropDistance, _baseShadowDistance);
-            _shadow.transform.localPosition = new Vector3(0, yThisFrame, _shadow.transform.localPosition.z);
+            _shadow.transform.localPosition = Vector3.MoveTowards(_shadow.transform.localPosition, _shadowTarget, _fallSpeed * Time.deltaTime);
         }
     }
 
     void Fall()
     {
-        transform.position = Vector3.MoveTowards(transform.position, _fallTarget, _fallSpeed * Time.deltaTime);
+        transform.localPosition = Vector3.MoveTowards(transform.localPosition, _fallTarget, _fallSpeed * Time.deltaTime);
         
-        if (transform.position == _fallTarget)
+        if (transform.localPosition == _fallTarget)
         {
             _falling = false;
-            _movement.ReturnToBaseNode();
+            OnLand?.Invoke();
         }
     }
 }

@@ -18,8 +18,6 @@
 
 ### TO DO ###
 - SCRIPTING
-    - Villager Pickup
-        - Finish implementing villager drop functionality
     - Villager Sprite
     - Villager Manager
         - Resource Manager

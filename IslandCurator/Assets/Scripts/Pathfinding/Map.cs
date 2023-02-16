@@ -7,10 +7,6 @@ public class Map : MonoBehaviour
 {
     [SerializeField] List<MapNode> _nodes = new List<MapNode>();
 
-    [Header("Gizmo Settings")]
-    [SerializeField] string _nodeIconFilename = null;
-    [SerializeField] bool _allowIconScaling = true;
-
     public List<MapNode> Nodes
     {
         get => _nodes;
@@ -31,7 +27,6 @@ public class Map : MonoBehaviour
                 }
             }
             
-            Gizmos.DrawIcon(node.transform.position, _nodeIconFilename, _allowIconScaling);
             drawnNodes.Add(node);
         }
     }
